@@ -1,0 +1,46 @@
+# https://taskfile.dev
+
+version: '3'
+
+dotenv: [".env"]
+
+tasks:
+  psql-up:
+    cmds:
+      - docker run --name greenlight-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -d postgres:alpine
+
+  psql-down:
+    cmds:
+      - docker rm -f greenlight-postgres
+
+  psql-start:
+    cmds:
+      - docker start greenlight-postgres
+
+  psql-stop:
+    cmds:
+      - docker stop greenlight-postgres
+  psql:
+    cmds:
+      - docker exec -it greenlight-postgres psql -U greenlight_user -d greenlight_db
+
+  psql-setup:
+    cmds:
+      - docker exec -it greenlight-postgres psql -U postgres -c "CREATE DATABASE greenlight_db;"
+      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "CREATE ROLE greenlight_user WITH LOGIN PASSWORD 'password';"
+      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "GRANT ALL ON DATABASE greenlight_db TO greenlight_user;"
+      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "ALTER DATABASE greenlight_db OWNER TO greenlight_user;"
+      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "CREATE EXTENSION IF NOT EXISTS citext;"
+
+  migrate-up:
+    cmds:
+      - migrate -path ./migrations -database "$GREENLIGHT_DSN" up
+  migrate-up-1:
+    cmds:
+      - migrate -path ./migrations -database "$GREENLIGHT_DSN" up 1
+  migrate-down:
+    cmds:
+      - migrate -path ./migrations -database "$GREENLIGHT_DSN" down
+  migrate-down-1:
+    cmds:
+      - migrate -path ./migrations -database "$GREENLIGHT_DSN" down 1
