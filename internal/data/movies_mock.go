@@ -2,6 +2,10 @@ package data
 
 type MockMovieModel struct{}
 
+func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	return nil, Metadata{}, nil
+}
+
 func (m MockMovieModel) Insert(movie *Movie) error {
 	return nil
 }
