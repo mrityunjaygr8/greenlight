@@ -132,13 +132,18 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 	err = app.models.Movies.Update(movie)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/movies/%d", movie.ID))
-	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, headers)
+	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, headers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
