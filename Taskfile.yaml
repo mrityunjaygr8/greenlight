@@ -5,6 +5,9 @@ version: '3'
 dotenv: [".env"]
 
 tasks:
+  run:
+    cmds:
+      - go run ./cmd/api -smtp-enable true
   psql-up:
     cmds:
       - docker run --name greenlight-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -d postgres:alpine
