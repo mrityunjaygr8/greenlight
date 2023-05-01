@@ -13,3 +13,7 @@ func (u MockUsersModel) GetByEmail(email string) (*User, error) {
 func (u MockUsersModel) Update(user *User) error {
 	return nil
 }
+
+func (u MockUsersModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error) {
+	return nil, nil
+}
