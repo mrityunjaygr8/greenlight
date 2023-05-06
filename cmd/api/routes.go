@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -24,5 +25,7 @@ func (app *application) routes() http.Handler {
 
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/authenticate", app.createAuthenticationTokenHandler)
 
-	return app.rateLimit(app.rateLimit(app.authenticate(router)))
+	router.Handler(http.MethodGet, "/debug/vars", expvar.Handler())
+
+	return app.metrics(app.rateLimit(app.rateLimit(app.authenticate(router))))
 }

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"expvar"
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/felixge/httpsnoop"
 	"golang.org/x/time/rate"
 )
 
@@ -72,5 +75,31 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 		mu.Unlock()
 		next.ServeHTTP(w, r)
+	})
+}
+
+type Metrics struct {
+	Code     int
+	Duration time.Duration
+	Written  int64
+}
+
+func (app *application) metrics(next http.Handler) http.Handler {
+	totalRequestsRecieved := expvar.NewInt("total_requests_recieved")
+	totalResponsesSent := expvar.NewInt("total_responses_sent")
+	totalProcessingTimeMicrosends := expvar.NewInt("total_processing_time_μs")
+
+	totalResponsesSentByStatus := expvar.NewMap("total_responses_sent_by_status")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		totalRequestsRecieved.Add(1)
+
+		metrics := httpsnoop.CaptureMetrics(next, w, r)
+
+		totalResponsesSent.Add(1)
+
+		totalProcessingTimeMicrosends.Add(metrics.Duration.Microseconds())
+
+		totalResponsesSentByStatus.Add(strconv.Itoa(metrics.Code), 1)
 	})
 }
