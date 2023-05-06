@@ -11,7 +11,10 @@ import (
 	"github.com/mrityunjaygr8/greenlight/internal/validator"
 )
 
-const ScopeActivation = "activation"
+const (
+	ScopeActivation     = "activation"
+	ScopeAuthentication = "authentication"
+)
 
 type TokenModelInterface interface {
 	New(userID int64, ttl time.Duration, scope string) (*Token, error)
@@ -20,11 +23,11 @@ type TokenModelInterface interface {
 }
 
 type Token struct {
-	Plaintext string
-	Hash      []byte
-	UserID    int64
-	Expiry    time.Time
-	Scope     string
+	Plaintext string    `json:"token"`
+	Hash      []byte    `json:"-"`
+	UserID    int64     `json:"-"`
+	Expiry    time.Time `json:"expiry"`
+	Scope     string    `json:"-"`
 }
 
 func generateToken(userID int64, ttl time.Duration, scope string) (*Token, error) {
