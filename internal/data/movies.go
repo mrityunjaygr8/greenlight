@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/lib/pq"
+	"github.com/mrityunjaygr8/greenlight/dbmodels"
 	"github.com/mrityunjaygr8/greenlight/internal/validator"
+	"github.com/volatiletech/sqlboiler/v4/queries/qm"
+	"github.com/volatiletech/sqlboiler/v4/types"
 )
 
 type Movie struct {
@@ -33,43 +35,72 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
-	query := fmt.Sprintf(`SELECT count(*) OVER(), id, created_at, title, year, runtime, genres, version 
-  FROM movies
-  WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
-  AND (genres @> $2 OR $2 = '{}')
-  ORDER BY %s %s, id ASC
-  LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+func dbToMovieModel(m dbmodels.Movie) (*Movie, error) {
+	movie := &Movie{
+		ID:        m.ID,
+		CreatedAt: m.CreatedAt,
+		Year:      int32(m.Year),
+		Title:     m.Title,
+		Genres:    []string(m.Genres),
+		Runtime:   Runtime(m.Runtime),
+		Version:   int32(m.Version),
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	return movie, nil
+}
+
+func dbToMovieModelSlice(movieSlice dbmodels.MovieSlice) ([]*Movie, error) {
+	movies := make([]*Movie, 0)
+	for _, mov := range movieSlice {
+		movie, err := dbToMovieModel(*mov)
+		if err != nil {
+			return []*Movie{}, err
+		}
+
+		movies = append(movies, movie)
+	}
+
+	return movies, nil
+}
+
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	query := make([]qm.QueryMod, 0)
+
+	if len(genres) > 0 {
+		query = append(query, qm.Where("genres @> ?", types.Array(genres)))
+	}
+
+	if title != "" {
+		query = append(query, qm.Where("to_tsvector('simple', title) @@ plainto_tsquery('simple', ?)", title))
+	}
+	ctx_1, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres), filters.limit(), filters.offset())
+	totalRecords, err := dbmodels.Movies(query...).Count(ctx_1, m.DB)
 	if err != nil {
 		return nil, Metadata{}, err
 	}
 
-	defer rows.Close()
+	ctx_2, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
 
-	totalRecords := 0
-	movies := []*Movie{}
-
-	for rows.Next() {
-		var movie Movie
-		err := rows.Scan(&totalRecords, &movie.ID, &movie.CreatedAt, &movie.Title, &movie.Year, &movie.Runtime, pq.Array(&movie.Genres), &movie.Version)
-
-		if err != nil {
-			return nil, Metadata{}, err
-		}
-
-		movies = append(movies, &movie)
+	queryOrdering := []qm.QueryMod{
+		qm.Limit(filters.limit()),
+		qm.Offset(filters.offset()),
+		qm.OrderBy(dbmodels.MovieColumns.ID),
 	}
-
-	if err = rows.Err(); err != nil {
+	queriesWithOrder := append(query, queryOrdering...)
+	moviesSQL, err := dbmodels.Movies(queriesWithOrder...).All(ctx_2, m.DB)
+	if err != nil {
 		return nil, Metadata{}, err
 	}
 
-	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+	movies, err := dbToMovieModelSlice(moviesSQL)
+	if err != nil {
+		return []*Movie{}, Metadata{}, err
+	}
+
+	metadata := calculateMetadata(int(totalRecords), filters.Page, filters.PageSize)
 
 	return movies, metadata, nil
 }
