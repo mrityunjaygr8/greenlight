@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"sync"
@@ -74,6 +75,10 @@ func openDB(cfg config) (*sql.DB, error) {
 	return db, nil
 }
 
+func get_db_dsn() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", os.Getenv("GREENLIGHT_DB_USER"), os.Getenv("GREENLIGHT_DB_PASS"), os.Getenv("GREENLIGHT_DB_HOST"), os.Getenv("GREENLIGHT_DB_PORT"), os.Getenv("GREENLIGHT_DB_NAME"), os.Getenv("GREENLIGHT_DB_SSLMODE"))
+}
+
 func main() {
 	// logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
@@ -86,7 +91,7 @@ func main() {
 
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
-	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("GREENLIGHT_DSN"), "Postgres DSN")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", get_db_dsn(), "Postgres DSN")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "Postgres max idle connections")
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "Postgres max open connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-open-time", "15m", "Postgres max connection idle time")

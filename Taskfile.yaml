@@ -2,9 +2,15 @@
 
 version: '3'
 
+vars:
+  GREENLIGHT_DSN: "postgres://$GREENLIGHT_DB_USER:$GREENLIGHT_DB_PASS@$GREENLIGHT_DB_HOST:$GREENLIGHT_DB_PORT/$GREENLIGHT_DB_NAME?sslmode=$GREENLIGHT_DB_SSLMODE"
+
 dotenv: [".env"]
 
 tasks:
+  echo:
+    cmds:
+      - echo "$GREENLIGHT_DSN"
   run:
     cmds:
       - go run ./cmd/api
@@ -13,7 +19,7 @@ tasks:
       - go run ./cmd/api -smtp-enable
   psql-up:
     cmds:
-      - docker run --name greenlight-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -d postgres:alpine
+      - docker run --name greenlight-postgres -p 5432:5432 -e POSTGRES_PASSWORD="$GREENLIGHT_DB_PASS" -d postgres:alpine
 
   psql-down:
     cmds:
@@ -28,25 +34,30 @@ tasks:
       - docker stop greenlight-postgres
   psql:
     cmds:
-      - docker exec -it greenlight-postgres psql -U greenlight_user -d greenlight_db
+      - docker exec -it greenlight-postgres psql -U "$GREENLIGHT_DB_USER" -d "$GREENLIGHT_DB_NAME"
 
   psql-setup:
     cmds:
-      - docker exec -it greenlight-postgres psql -U postgres -c "CREATE DATABASE greenlight_db;"
-      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "CREATE ROLE greenlight_user WITH LOGIN PASSWORD 'password';"
-      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "GRANT ALL ON DATABASE greenlight_db TO greenlight_user;"
-      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "ALTER DATABASE greenlight_db OWNER TO greenlight_user;"
-      - docker exec -it greenlight-postgres psql -U postgres -d greenlight_db -c "CREATE EXTENSION IF NOT EXISTS citext;"
+      - docker exec -it greenlight-postgres psql -U postgres -c "CREATE DATABASE $GREENLIGHT_DB_NAME;"
+      - docker exec -it greenlight-postgres psql -U postgres -d "$GREENLIGHT_DB_NAME" -c "CREATE ROLE $GREENLIGHT_DB_USER WITH LOGIN PASSWORD '$GREENLIGHT_DB_PASS';"
+      - docker exec -it greenlight-postgres psql -U postgres -d "$GREENLIGHT_DB_NAME" -c "GRANT ALL ON DATABASE $GREENLIGHT_DB_NAME TO $GREENLIGHT_DB_USER;"
+      - docker exec -it greenlight-postgres psql -U postgres -d "$GREENLIGHT_DB_NAME" -c "ALTER DATABASE $GREENLIGHT_DB_NAME OWNER TO $GREENLIGHT_DB_USER;"
+      - docker exec -it greenlight-postgres psql -U postgres -d "$GREENLIGHT_DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS citext;"
 
   migrate-up:
     cmds:
-      - migrate -path ./migrations -database "$GREENLIGHT_DSN" up
+      - migrate -path ./migrations -database "{{ .GREENLIGHT_DSN }}" up
   migrate-up-1:
     cmds:
-      - migrate -path ./migrations -database "$GREENLIGHT_DSN" up 1
+      - migrate -path ./migrations -database "{{ .GREENLIGHT_DSN }}" up 1
   migrate-down:
     cmds:
-      - migrate -path ./migrations -database "$GREENLIGHT_DSN" down
+      - migrate -path ./migrations -database "{{ .GREENLIGHT_DSN }}" down
   migrate-down-1:
     cmds:
-      - migrate -path ./migrations -database "$GREENLIGHT_DSN" down 1
+      - migrate -path ./migrations -database "{{ .GREENLIGHT_DSN }}" down 1
+
+  
+  sqlboiler:
+    cmds:
+      - PSQL_DBNAME="$GREENLIGHT_DB_NAME" PSQL_HOST="$GREENLIGHT_DB_HOST" PSQL_USER="$GREENLIGHT_DB_USER" PSQL_PASS="$GREENLIGHT_DB_PASS" PSQL_SSLMODE="$GREENLIGHT_DB_SSLMODE" PSQL_PORT="$GREENLIGHT_DB_PORT" sqlboiler --wipe psql
