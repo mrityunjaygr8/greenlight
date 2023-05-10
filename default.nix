@@ -6,5 +6,6 @@ pkgs.mkShell {
     # pkgs.fish
     pkgs.go-migrate
     pkgs.go-task
+    (pkgs.callPackage ./sqlboiler.nix { })
   ];
 }
