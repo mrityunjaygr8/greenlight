@@ -2,7 +2,7 @@ package data
 
 type MockMovieModel struct{}
 
-func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) (*[]Movie, Metadata, error) {
 	return nil, Metadata{}, nil
 }
 

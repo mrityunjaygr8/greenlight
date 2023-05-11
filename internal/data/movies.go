@@ -14,17 +14,17 @@ import (
 )
 
 type Movie struct {
-	ID        int64     `json:"id"`
-	CreatedAt time.Time `json:"-"`
-	Title     string    `json:"title"`
-	Year      int32     `json:"year,omitempty"`
-	Runtime   Runtime   `json:"runtime,omitempty"`
-	Genres    []string  `json:"genres,omitempty"`
-	Version   int32     `json:"version"`
+	ID        int64             `json:"id"`
+	CreatedAt time.Time         `json:"-"`
+	Title     string            `json:"title"`
+	Year      int32             `json:"year,omitempty"`
+	Runtime   Runtime           `json:"runtime,omitempty"`
+	Genres    types.StringArray `json:"genres,omitempty"`
+	Version   int32             `json:"version"`
 }
 
 type MovieModelInterface interface {
-	GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error)
+	GetAll(title string, genres []string, filters Filters) (*[]Movie, Metadata, error)
 	Insert(movie *Movie) error
 	Get(id int64) (*Movie, error)
 	Update(movie *Movie) error
@@ -35,35 +35,35 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-func dbToMovieModel(m dbmodels.Movie) (*Movie, error) {
-	movie := &Movie{
-		ID:        m.ID,
-		CreatedAt: m.CreatedAt,
-		Year:      int32(m.Year),
-		Title:     m.Title,
-		Genres:    []string(m.Genres),
-		Runtime:   Runtime(m.Runtime),
-		Version:   int32(m.Version),
-	}
+// func dbToMovieModel(m dbmodels.Movie) (*Movie, error) {
+// 	movie := &Movie{
+// 		ID:        m.ID,
+// 		CreatedAt: m.CreatedAt,
+// 		Year:      int32(m.Year),
+// 		Title:     m.Title,
+// 		Genres:    []string(m.Genres),
+// 		Runtime:   Runtime(m.Runtime),
+// 		Version:   int32(m.Version),
+// 	}
+//
+// 	return movie, nil
+// }
 
-	return movie, nil
-}
+// func dbToMovieModelSlice(movieSlice dbmodels.MovieSlice) ([]*Movie, error) {
+// 	movies := make([]*Movie, 0)
+// 	for _, mov := range movieSlice {
+// 		movie, err := dbToMovieModel(*mov)
+// 		if err != nil {
+// 			return []*Movie{}, err
+// 		}
+//
+// 		movies = append(movies, movie)
+// 	}
+//
+// 	return movies, nil
+// }
 
-func dbToMovieModelSlice(movieSlice dbmodels.MovieSlice) ([]*Movie, error) {
-	movies := make([]*Movie, 0)
-	for _, mov := range movieSlice {
-		movie, err := dbToMovieModel(*mov)
-		if err != nil {
-			return []*Movie{}, err
-		}
-
-		movies = append(movies, movie)
-	}
-
-	return movies, nil
-}
-
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) (*[]Movie, Metadata, error) {
 	query := make([]qm.QueryMod, 0)
 
 	if len(genres) > 0 {
@@ -90,19 +90,16 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 		qm.OrderBy(dbmodels.MovieColumns.ID),
 	}
 	queriesWithOrder := append(query, queryOrdering...)
-	moviesSQL, err := dbmodels.Movies(queriesWithOrder...).All(ctx_2, m.DB)
+
+	moviesSQL := make([]Movie, 0)
+	err = dbmodels.Movies(queriesWithOrder...).Bind(ctx_2, m.DB, &moviesSQL)
 	if err != nil {
 		return nil, Metadata{}, err
 	}
 
-	movies, err := dbToMovieModelSlice(moviesSQL)
-	if err != nil {
-		return []*Movie{}, Metadata{}, err
-	}
-
 	metadata := calculateMetadata(int(totalRecords), filters.Page, filters.PageSize)
 
-	return movies, metadata, nil
+	return &moviesSQL, metadata, nil
 }
 
 func (m MovieModel) Insert(movie *Movie) error {
